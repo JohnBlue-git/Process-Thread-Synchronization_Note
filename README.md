@@ -108,10 +108,13 @@ fun2 ()	{
 ## Some Reference
 
 The following are some materials for deep understanding of synchronization in (linux) kernel: \
+
 (1) \
 https://hackmd.io/@owlfox/SyVVY3EgI/https%3A%2F%2Fhackmd.io%2Fs%2FSJpp-bN0m#QueuedMCS-Spinlock
+
 (2) \
 https://blog.louie.lu/2016/10/22/mutex-semaphore-the-difference-and-linux-kernel/
+
 (3) \
 https://hackmd.io/@RinHizakura/rJhEpdyNw
 
