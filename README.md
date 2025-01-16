@@ -18,6 +18,7 @@
   - **semaphore** doesn't has lock owner.
 
 - **spinlock**:
+  - Preccess:  Attempt to Lock  >  Check Lock State  >  Acquire Lock  >  CPU Spin-Wait (During the spin-wait loop, the CPU is actively used by the spinning thread. This can lead to high CPU utilization because the thread remains in a busy-wait state rather than being put to sleep by the operating system)
   - It will keep trying to get the lock (when counter is 1) without sleeping, and the modern linux will apply ticket policy to prevent starving.
   - **spinlock** has lock own and the lock should be unlock by the same owner.
   - When using ***spinlock*** in to design of kernel, it is often cruicial to consider for preventing deadlock or not able to unlock: interrupt (better not to used in ISR) / sleep function (not to use sleep, spinlock aim to protect something that have to be done before sleep)
@@ -32,6 +33,7 @@ while (atomic_dec(&lock->counter != 0))	{
 ```
 
 - **mutex**:
+  - Proccess:  Attempt to Lock  >  Check Lock State  >  Acquire Lock  >  CPU Blocking  >  Context Switch (it's likely to happened): The operating system performs a context switch, saving the state of the blocked thread and scheduling another thread for execution.
   - It is late introduced and could be the complicatest lock in Linux. It will use lock() and unlock() to perform blocking.
   - **mutex** has lock own and the lock should be unlock by the same owner.
 
