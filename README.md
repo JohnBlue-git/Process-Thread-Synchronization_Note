@@ -49,6 +49,17 @@ while (atomic_dec(&lock->counter != 0))	{
   - **seqlock** implement rules (writer priority):
     - writer then lock (and block reader) / allow multiple readers keep try read  
 
+### Some more comparison among locks
+The overhead of **pthread_spinlock_t** may be lower compared to **std::atomic_flag** due to the specific implementation and optimizations provided by the POSIX threads (pthreads) library.
+- **pthread_spinlock_t**
+  - Specialization: pthread_spinlock_t is a specialized synchronization primitive designed for high-performance, low-latency locking in multi-threaded environments. It is implemented with specific low-level optimizations for the target platform, often using assembly language instructions to minimize the overhead.
+  - Architecture-Specific Optimizations: pthread_spinlock_t can take advantage of architecture-specific features and instructions, such as cache line optimizations and memory ordering guarantees, to reduce the latency of acquiring and releasing the lock.
+  - Implementation Focus: As part of the POSIX standard, pthread_spinlock_t is optimized for common use cases in POSIX-compliant operating systems, providing efficient low-level spinlock behavior.
+- **std::atomic_flag**
+  - Generalization: std::atomic_flag is a general-purpose atomic primitive defined in the C++ standard library. It is designed to provide a simple, portable interface for atomic operations, and its implementation may prioritize   portability and correctness over low-level performance optimizations.
+  - Abstractions: The C++ standard library provides a higher level of abstraction, which may introduce additional overhead compared to specialized low-level primitives. This includes ensuring compatibility across different platforms and maintaining the correctness of the atomic operations.
+  - Compiler and Library Implementation: The performance of std::atomic_flag depends on the specific implementation provided by the compiler and standard library. While modern compilers and libraries aim to optimize atomic operations, they may still have slightly higher overhead compared to highly specialized low-level primitives like pthread_spinlock_t.
+
 ## Possible Issues of Lock
 - Deadlock:
   - two or more threads are using the same two or more resource, and will meet deadlock when neither of thread can get sufficient resources to work (and no thread releases the resouces).
@@ -85,12 +96,13 @@ fun2 ()	{
 
 # Library for implementations
 - Kthread:
-  - the kernel thread that handle the user thread and directly execute with the hardware resources.
+  - The kernel thread that handle the user thread and directly execute with the hardware resources.
 - Kernel library:
-  - the library for developing kernel including kthread. usually, the library header look like <linux/xxx.h>.
+  - The library for developing kernel including kthread. usually, the library header look like <linux/xxx.h>.
 - Pthread:
-  - it is an interface specification that define api for engineer to develop user thread. The library is <pthread.h>.
-
+  - It is an interface specification that define api for engineer to develop user thread. The library is <pthread.h>.
+- <thread> in (C++ STD library)
+  - It was introduced in C++11. 
 - Hints:
   - In modern computer system, machine will provide atomic operation to support synchronization primitives such as spinlock.
   - Pthread also has spinlock, but no need to worry interrupt and ISR, since these are handle by the Kernel.
