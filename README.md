@@ -1,139 +1,46 @@
+# Processes, threads, and synchronization
 
-## Process & Thread
-- Processe
-  - Processes are basically the programs that are dispatched from the ready state and are scheduled in the CPU for execution.
-  - PCB (Process Control Block) holds the context of process.
-  - A process can create other processes which are known as Child Processes.
-  - A process is isolated means it does not share the memory with any other process.
-- Thread
-  - Threads are ***individual sequences of execution within a process***. They allow programs to perform multiple tasks concurrently.
-  - In simpler terms, a thread is like a lightweight process. A single process can have multiple threads, and these threads can run concurrently, sharing the same memory space.
+A practical, cross-platform-oriented set of notes and small programs for learning
+execution units and synchronization. The examples distinguish user-space APIs
+from Linux kernel APIs; they are educational, not production-ready libraries.
 
-## Synchronization
-- Synchronization is **the coordination of multiple threads** to ensure that they execute in a desired order and that they don't interfere with each other's operations.
-- Common synchronization mechanisms include locks **mutexe, semaphore, monitor, and barrier**. These mechanisms help control access to shared resources, ensuring that only one thread can access a resource at a time or enforcing certain ordering constraints.
+## Project map
 
-- **semaphore**:
-  - It is the basic and the most common implement of synchronization. It's like a flag with counter, and it will use wait() and signal() to perform blocking.
-  - **semaphore** doesn't has lock owner.
+| Area | Contents |
+| --- | --- |
+| [Execution units](execution_units/EXECUTION.md) | Processes, threads, OS structures, and platform-specific examples |
+| [Synchronization](synchronization/SYNC.md) | Mutexes, semaphores, condition variables, reader-writer locks, seqlocks, and atomics |
+| [Process example](execution_units/process/) | POSIX `fork()` and `waitpid()` |
+| [POSIX threads](execution_units/pthread/PTHREAD.md) | pthread lifecycle and synchronization examples |
+| [C++ threads](execution_units/std-thread/STDTHREAD.md) | `std::thread` and C++ synchronization examples |
+| [Linux kernel threads](execution_units/kthread/KTHREAD.md) | Kernel module examples and build guidance |
 
-- **spinlock**:
-  - Preccess:  Attempt to Lock  >  Check Lock State  >  Acquire Lock  >  CPU Spin-Wait (During the spin-wait loop, the CPU is actively used by the spinning thread. This can lead to high CPU utilization because the thread remains in a busy-wait state rather than being put to sleep by the operating system)
-  - It will keep trying to get the lock (when counter is 1) without sleeping, and the modern linux will apply ticket policy to prevent starving.
-  - **spinlock** has lock own and the lock should be unlock by the same owner.
-  - When using ***spinlock*** in to design of kernel, it is often cruicial to consider for preventing deadlock or not able to unlock: interrupt (better not to used in ISR) / sleep function (not to use sleep, spinlock aim to protect something that have to be done before sleep)
-  - **For optimization**, we can use MCS spinlock for reducing context switch and still maintain ticket policy (lock only queued and spin on it own cacheline).
-```
-while (atomic_dec(&lock->counter != 0))	{
-    while	(lock->counter <= 0) {
-        // Pause the CPU until some coherence	
-        // two loop two for consideration of cache line effect
-    }	
-}
+## Build user-space examples with CMake
+
+The root CMake project builds every process, pthread, C++ thread, and
+synchronization example as a separate executable:
+
+```sh
+cmake -S . -B build
+cmake --build build --parallel
+./build/execution_units/pthread/pthread_condition_variable
 ```
 
-- **mutex**:
-  - Proccess:  Attempt to Lock  >  Check Lock State  >  Acquire Lock  >  CPU Blocking  >  Context Switch (it's likely to happened): The operating system performs a context switch, saving the state of the blocked thread and scheduling another thread for execution.
-  - It is late introduced and could be the complicatest lock in Linux. It will use lock() and unlock() to perform blocking.
-  - **mutex** has lock own and the lock should be unlock by the same owner.
+The layered CMake files mirror the source tree: the root project adds
+`execution_units/` and `synchronization/`, which add their own example
+subdirectories. `execution_units/kthread/` is deliberately not included.
 
-- **reader writer lock**:
-  - **reader writer lock** rules (reader priority):
-    - allow multiple reader at a time / when no reader, one writer at a time
-  - **reader writer lock** implement rules (reader priority):
-    - first reader then lock / last reader leave then unlock / writer then lock
+To build only one demo, select its target, such as
+`cmake --build build --target synchronization_seqlock`. The POSIX process and
+pthread demos require a POSIX-compatible system. The Linux kernel examples are
+intentionally excluded from this CMake project; they must be built against
+headers matching the target kernel. See
+[KTHREAD.md](execution_units/kthread/KTHREAD.md). Do not load an unfamiliar
+kernel module on a production system.
 
-- **seqlock**
-  - **seqlock** rules (writer priority):
-    - one writer at a time / allow multiple reader at a time
-  - **seqlock** implement rules (writer priority):
-    - writer then lock (and block reader) / allow multiple readers keep try read  
+## Further reading
 
-### Some more comparison among locks
-The overhead of **pthread_spinlock_t** may be lower compared to **std::atomic_flag** due to the specific implementation and optimizations provided by the POSIX threads (pthreads) library.
-- **pthread_spinlock_t**
-  - Specialization: pthread_spinlock_t is a specialized synchronization primitive designed for high-performance, low-latency locking in multi-threaded environments. It is implemented with specific low-level optimizations for the target platform, often using assembly language instructions to minimize the overhead.
-  - Architecture-Specific Optimizations: pthread_spinlock_t can take advantage of architecture-specific features and instructions, such as cache line optimizations and memory ordering guarantees, to reduce the latency of acquiring and releasing the lock.
-  - Implementation Focus: As part of the POSIX standard, pthread_spinlock_t is optimized for common use cases in POSIX-compliant operating systems, providing efficient low-level spinlock behavior.
-- **std::atomic_flag**
-  - Generalization: std::atomic_flag is a general-purpose atomic primitive defined in the C++ standard library. It is designed to provide a simple, portable interface for atomic operations, and its implementation may prioritize   portability and correctness over low-level performance optimizations.
-  - Abstractions: The C++ standard library provides a higher level of abstraction, which may introduce additional overhead compared to specialized low-level primitives. This includes ensuring compatibility across different platforms and maintaining the correctness of the atomic operations.
-  - Compiler and Library Implementation: The performance of std::atomic_flag depends on the specific implementation provided by the compiler and standard library. While modern compilers and libraries aim to optimize atomic operations, they may still have slightly higher overhead compared to highly specialized low-level primitives like pthread_spinlock_t.
-
-## Possible Issues of Lock
-- Deadlock:
-  - two or more threads are using the same two or more resource, and will meet deadlock when neither of thread can get sufficient resources to work (and no thread releases the resouces).
-```
-fun1 ()	{
-    lock(&A) {
-        lock(&B) { }
-    }	
-}
-fun2 ()	{
-    lock(&B) {
-        lock(&A) { }
-    }	
-}
-```
-- Livelock:
-  - two or more threads are using the same two or more resource, and will meet livelock when neither of thread can get sufficient resources to work (but all the threads are willing to release the resouces).
-```
-fun1 ()	{
-    lock(&A)
-    if (try_lock(&B) == true) {}
-    else { release(&A) }
-}
-fun2 ()	{
-    lock(&B)
-    if (try_lock(&A) == true) {}
-    else { release(&B) }
-}
-```
-- Starving:
-  - some threads are starving.
-
-----
-
-# Library for implementations
-- Kthread:
-  - The kernel thread that handle the user thread and directly execute with the hardware resources.
-- Kernel library:
-  - The library for developing kernel including kthread. usually, the library header look like <linux/xxx.h>.
-- Pthread:
-  - It is an interface specification that define api for engineer to develop user thread. The library is <pthread.h>.
-- <thread> in (C++ STD library)
-  - It was introduced in C++11. 
-- Hints:
-  - In modern computer system, machine will provide atomic operation to support synchronization primitives such as spinlock.
-  - Pthread also has spinlock, but no need to worry interrupt and ISR, since these are handle by the Kernel.
-  - Pthread have implemented conditional variables, but Linux kernel doesn't have.
-
-----
-
-## Some Background Knowledge
-- Kernel is operation system. It's a group of program that provides essential services and functions to manage hardware resources and facilitate communication between software and hardware components. \
-  Appilcation(User) <-> Kernel <-> Hardware Resource(CPU, Memory, ...)
-- Program: the code
-- Proccess: the entity of the code
-- User mode VS Kernel mode: CPU will check which mode the section in the program belong, and decide whether the section have sufficient authencation to execute (the hardware).
-- User space VS Kernel space: the memory or code section that can be operated in User mode or Kernel mode.
-- System Calls used in user program are performed in Kernel mode !
-
-## Some Reference
-
-The following are some materials for deep understanding of synchronization in (linux) kernel: \
-
-(1) \
-https://hackmd.io/@owlfox/SyVVY3EgI/https%3A%2F%2Fhackmd.io%2Fs%2FSJpp-bN0m#QueuedMCS-Spinlock
-
-(2) \
-https://blog.louie.lu/2016/10/22/mutex-semaphore-the-difference-and-linux-kernel/
-
-(3) \
-https://hackmd.io/@RinHizakura/rJhEpdyNw
-
-About Linux: \
-https://www.cntofu.com/book/46/linux_device_driver_programming/tong_bu_yu_suo_ding.md#google_vignette
-
-About seqlock: \
-http://www.wowotech.net/kernel_synchronization/seqlock.html
+The companion project [BasicThreadLock](https://github.com/JohnBlue-git/BasicThreadLock)
+contains concise C++ demonstrations of mutexes, spin locks, condition variables,
+semaphores, and a bounded producer-consumer scenario. This repository expands
+those introductory ideas with lifecycle, memory-model, OS, and kernel context.
